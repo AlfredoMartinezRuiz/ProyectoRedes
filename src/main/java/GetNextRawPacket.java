@@ -5,9 +5,11 @@ import java.net.Inet4Address;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
+import org.pcap4j.core.BpfProgram;
 import org.pcap4j.core.BpfProgram.BpfCompileMode;
 import org.pcap4j.core.NotOpenException;
 import org.pcap4j.core.PcapAddress;
+import org.pcap4j.core.PcapDumper;
 import org.pcap4j.core.PcapHandle;
 import org.pcap4j.core.PcapNativeException;
 import org.pcap4j.core.PcapNetworkInterface;
@@ -19,12 +21,16 @@ import org.pcap4j.packet.IpV4Packet;
 import org.pcap4j.packet.namednumber.IpNumber;
 import org.pcap4j.util.ByteArrays;
 import org.pcap4j.util.NifSelector;
+import org.pcap4j.core.PcapHandle.TimestampPrecision;
+import org.pcap4j.packet.Packet;
 
 @SuppressWarnings("javadoc")
 public class GetNextRawPacket {
+    
+    private static final String PCAP_FILE_KEY = GetNextRawPacket.class.getName() + ".pcapFile";
 
     private static final String COUNT_KEY = GetNextRawPacket.class.getName() + ".count";
-    private static final int COUNT = Integer.getInteger(COUNT_KEY, 40);
+    
 
     private static final String READ_TIMEOUT_KEY = GetNextRawPacket.class.getName() + ".readTimeout";
     private static final int READ_TIMEOUT = Integer.getInteger(READ_TIMEOUT_KEY, 10); // [ms]
@@ -38,62 +44,91 @@ public class GetNextRawPacket {
 
     private static final String NIF_NAME_KEY = GetNextRawPacket.class.getName() + ".nifName";
     private static final String NIF_NAME = System.getProperty(NIF_NAME_KEY);
+    
+    
 
     private GetNextRawPacket() {
     }
 
     public static void main(String[] args) throws PcapNativeException, NotOpenException, IllegalRawDataException {
-        System.out.println("Escriba el nombre de la trama disponible a capturar.");
-        System.out.println("1.- ARP");
-        System.out.println("2.- IP");
         Scanner scanner = new Scanner(System.in);
-        String filtro = scanner.nextLine();
-        String filter = args.length != 0 ? args[0] : filtro;
-        System.out.println(COUNT_KEY + ": " + COUNT);
-        System.out.println(READ_TIMEOUT_KEY + ": " + READ_TIMEOUT);
-        System.out.println(SNAPLEN_KEY + ": " + SNAPLEN);
-        System.out.println(BUFFER_SIZE_KEY + ": " + BUFFER_SIZE);
-        System.out.println(NIF_NAME_KEY + ": " + NIF_NAME);
-        System.out.println("\n");
-        PcapNetworkInterface nif;
-        if (NIF_NAME != null) {
-            nif = Pcaps.getDevByName(NIF_NAME);
-        } else {
+        PcapHandle handle = null;
+        System.out.println("Analizador de protocolos\n");
+        System.out.println("0 --> Realizar traza de captura de paquetes al vuelo");
+        System.out.println("1 --> Cargar traza de captura de paquetes desde un archivo");
+        System.out.print("\nElige una de las opciones:");
+        int opcion = Integer.parseInt(scanner.nextLine());
+        
+        System.out.println("Ingrese la cantidad de tramas a ser capturadas y analizadas: ");
+        int COUNT = Integer.getInteger(COUNT_KEY, Integer.parseInt(scanner.nextLine())); //especifica la cantidad de tramas
+        
+        if(opcion == 1){ //carga un archivo .pcap
+            System.out.println("Ingresa el nombre de tu archivo con el formato: nombreArchivo.pcap");
+            String PCAP_FILE = System.getProperty(PCAP_FILE_KEY, scanner.nextLine());
             try {
-                nif = new NifSelector().selectNetworkInterface();
-            } catch (IOException e) {
-                e.printStackTrace();
-                return;
+                handle = Pcaps.openOffline(PCAP_FILE, TimestampPrecision.NANO);
+            } catch (PcapNativeException e) {
+                handle = Pcaps.openOffline(PCAP_FILE);
             }
-            if (nif == null) {
-                return;
+        } else if(opcion == 0){ // captura tramas al vuelo
+            System.out.println(COUNT_KEY + ": " + COUNT);
+            System.out.println(READ_TIMEOUT_KEY + ": " + READ_TIMEOUT);
+            System.out.println(SNAPLEN_KEY + ": " + SNAPLEN);
+            System.out.println(BUFFER_SIZE_KEY + ": " + BUFFER_SIZE);
+            System.out.println(NIF_NAME_KEY + ": " + NIF_NAME);
+            System.out.println("\n");
+            PcapNetworkInterface nif;
+            if (NIF_NAME != null) {
+                nif = Pcaps.getDevByName(NIF_NAME);
+            } else {
+                try {
+                    nif = new NifSelector().selectNetworkInterface();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return;
+                }
+                if (nif == null) {
+                    return;
+                }
             }
+
+            System.out.println(nif.getName() + " (" + nif.getDescription() + ")");
+            for (PcapAddress addr : nif.getAddresses()) {
+                if (addr.getAddress() != null) {
+                    System.out.println("IP address: " + addr.getAddress());
+                }
+            }
+            System.out.println("");
+            /* FILTRO */
+            System.out.println("Escriba el nombre de la trama disponible a capturar.");
+            System.out.println("1.- ARP");
+            System.out.println("2.- IP");
+            String filtro = scanner.nextLine();
+            
+            String filter = args.length != 0 ? args[0] : filtro;
+            handle
+                    = new PcapHandle.Builder(nif.getName())
+                            .snaplen(SNAPLEN)
+                            .promiscuousMode(PromiscuousMode.PROMISCUOUS)
+                            .timeoutMillis(READ_TIMEOUT)
+                            .bufferSize(BUFFER_SIZE)
+                            .build();
+
+            handle.setFilter(filter, BpfCompileMode.OPTIMIZE);
+            
         }
-
-        System.out.println(nif.getName() + " (" + nif.getDescription() + ")");
-        for (PcapAddress addr : nif.getAddresses()) {
-            if (addr.getAddress() != null) {
-                System.out.println("IP address: " + addr.getAddress());
-            }
-        }
-        System.out.println("");
-
-        PcapHandle handle
-                = new PcapHandle.Builder(nif.getName())
-                        .snaplen(SNAPLEN)
-                        .promiscuousMode(PromiscuousMode.PROMISCUOUS)
-                        .timeoutMillis(READ_TIMEOUT)
-                        .bufferSize(BUFFER_SIZE)
-                        .build();
-
-        handle.setFilter(filter, BpfCompileMode.OPTIMIZE);
-
+        
+        String ofile = "traza_exportada.cap";
+        PcapDumper dumper = handle.dumpOpen(ofile); // exportamos el archivo
         int num = 0;
         while (true) {
+            Packet p = handle.getNextPacket();
             byte[] packet = handle.getNextRawPacket();
             if (packet == null) {
                 continue;
             } else {
+                dumper.dumpRaw(packet, handle.getTimestamp()); //escribimos en el archivo las tramas
+                
                 int tipo_b1 = (packet[12] >= 0) ? packet[12] * 256 : (packet[12] + 256) * 256;
                 //Primer byte del campo tipo
                 int tipo_b2 = (packet[13] >= 0) ? packet[13] : packet[13] + 256;
@@ -367,14 +402,16 @@ public class GetNextRawPacket {
                         }
 
                     }
-
-                    PcapStat ps = handle.getStats();
-                    System.out.println("ps_recv: " + ps.getNumPacketsReceived());
-                    System.out.println("ps_drop: " + ps.getNumPacketsDropped());
-                    System.out.println("ps_ifdrop: " + ps.getNumPacketsDroppedByIf());
-                    if (Platform.isWindows()) {
-                        System.out.println("bs_capt: " + ps.getNumPacketsCaptured());
-                    }
+                    if(opcion == 0){      
+                        PcapStat ps = handle.getStats();
+                        System.out.println("ps_recv: " + ps.getNumPacketsReceived());
+                        System.out.println("ps_drop: " + ps.getNumPacketsDropped());
+                        System.out.println("ps_ifdrop: " + ps.getNumPacketsDroppedByIf());
+                        if (Platform.isWindows()) {
+                            System.out.println("bs_capt: " + ps.getNumPacketsCaptured());
+                        }
+                    }                      
+                    dumper.close();
                     handle.close();
                 }
       public static String convertirDecimalABinarioLongitud(long decimal,int n) {
