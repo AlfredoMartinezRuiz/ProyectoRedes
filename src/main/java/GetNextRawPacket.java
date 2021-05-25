@@ -23,15 +23,19 @@ import org.pcap4j.util.ByteArrays;
 import org.pcap4j.util.NifSelector;
 import org.pcap4j.core.PcapHandle.TimestampPrecision;
 import org.pcap4j.packet.Packet;
+import javax.swing.JOptionPane;
 
 @SuppressWarnings("javadoc")
 public class GetNextRawPacket {
+    
+    private static final String[] MENU = {"Captura de paquetes al vuelo", "Captura de paquetes desde un archivo"};
+    
+    private static final String[] TYPE = {"ARP", "IP"};
     
     private static final String PCAP_FILE_KEY = GetNextRawPacket.class.getName() + ".pcapFile";
 
     private static final String COUNT_KEY = GetNextRawPacket.class.getName() + ".count";
     
-
     private static final String READ_TIMEOUT_KEY = GetNextRawPacket.class.getName() + ".readTimeout";
     private static final int READ_TIMEOUT = Integer.getInteger(READ_TIMEOUT_KEY, 10); // [ms]
 
@@ -53,16 +57,35 @@ public class GetNextRawPacket {
     public static void main(String[] args) throws PcapNativeException, NotOpenException, IllegalRawDataException {
         Scanner scanner = new Scanner(System.in);
         PcapHandle handle = null;
-        System.out.println("Analizador de protocolos\n");
+        String opcion, filtro;
+        int COUNT = 0;
+        opcion = (String) JOptionPane.showInputDialog(null,
+                    "Opciones disponibles",
+                    "Analizador de paquetes",
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    MENU,
+                    MENU[0]);
+        /*System.out.println("Analizador de protocolos\n");
+        System.out.print("Elige una de las siguientes opciones:\n");
         System.out.println("0 --> Realizar traza de captura de paquetes al vuelo");
         System.out.println("1 --> Cargar traza de captura de paquetes desde un archivo");
-        System.out.print("\nElige una de las opciones:");
-        int opcion = Integer.parseInt(scanner.nextLine());
-        
-        System.out.println("Ingrese la cantidad de tramas a ser capturadas y analizadas: ");
+        int opcion = Integer.parseInt(scanner.nextLine());*/
+        try{
+            COUNT = Integer.parseInt(JOptionPane.showInputDialog(
+                    null,
+                    "Ingresa el numero de tramas a ser capturada",
+                    opcion,
+                    JOptionPane.QUESTION_MESSAGE
+                ));
+        }catch(NumberFormatException e){
+                System.exit(0);
+        }
+        /*System.out.println("\nIngrese la cantidad de tramas a ser capturadas y analizadas: ");
         int COUNT = Integer.getInteger(COUNT_KEY, Integer.parseInt(scanner.nextLine())); //especifica la cantidad de tramas
+        */
         
-        if(opcion == 1){ //carga un archivo .pcap
+        if(opcion.equals("Captura de paquetes desde un archivo")){ //carga un archivo .pcap
             System.out.println("Ingresa el nombre de tu archivo con el formato: nombreArchivo.pcap");
             String PCAP_FILE = System.getProperty(PCAP_FILE_KEY, scanner.nextLine());
             try {
@@ -70,7 +93,10 @@ public class GetNextRawPacket {
             } catch (PcapNativeException e) {
                 handle = Pcaps.openOffline(PCAP_FILE);
             }
-        } else if(opcion == 0){ // captura tramas al vuelo
+        } else if(opcion.equals("Captura de paquetes al vuelo")){ // captura tramas al vuelo
+            JOptionPane.showConfirmDialog(null,
+                    "A continuación se imprimiran en consola las tarjetas de red disponibles",
+                    opcion,JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
             System.out.println(COUNT_KEY + ": " + COUNT);
             System.out.println(READ_TIMEOUT_KEY + ": " + READ_TIMEOUT);
             System.out.println(SNAPLEN_KEY + ": " + SNAPLEN);
@@ -91,7 +117,6 @@ public class GetNextRawPacket {
                     return;
                 }
             }
-
             System.out.println(nif.getName() + " (" + nif.getDescription() + ")");
             for (PcapAddress addr : nif.getAddresses()) {
                 if (addr.getAddress() != null) {
@@ -100,12 +125,21 @@ public class GetNextRawPacket {
             }
             System.out.println("");
             /* FILTRO */
-            System.out.println("Escriba el nombre de la trama disponible a capturar.");
+            filtro = (String) JOptionPane.showInputDialog(null,
+                    "Filtros disponibles",
+                    "Analizador de paquetes",
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    TYPE,
+                    TYPE[0]);
+            
+            //System.out.println("Escriba el nombre de la trama disponible a capturar.");
+            /*System.out.println("Seleccione la trama a capturar.");
             System.out.println("1.- ARP");
             System.out.println("2.- IP");
-            String filtro = scanner.nextLine();
+            String filtro = scanner.nextLine();*/
             
-            String filter = args.length != 0 ? args[0] : filtro;
+            String filter = args.length != 0 ? args[0] : filtro.toLowerCase();
             handle
                     = new PcapHandle.Builder(nif.getName())
                             .snaplen(SNAPLEN)
@@ -115,8 +149,12 @@ public class GetNextRawPacket {
                             .build();
 
             handle.setFilter(filter, BpfCompileMode.OPTIMIZE);
+            JOptionPane.showConfirmDialog(null,
+                    "A continuación se imprimiran en consola "+COUNT+" tramas de tipo "+ filtro,
+                    opcion,JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
             
         }
+        
         
         String ofile = "traza_exportada.cap";
         PcapDumper dumper = handle.dumpOpen(ofile); // exportamos el archivo
@@ -402,7 +440,7 @@ public class GetNextRawPacket {
                         }
 
                     }
-                    if(opcion == 0){      
+                    if(opcion.equals("Captura de paquetes al vuelo")){      
                         PcapStat ps = handle.getStats();
                         System.out.println("ps_recv: " + ps.getNumPacketsReceived());
                         System.out.println("ps_drop: " + ps.getNumPacketsDropped());
@@ -413,6 +451,9 @@ public class GetNextRawPacket {
                     }                      
                     dumper.close();
                     handle.close();
+                    JOptionPane.showConfirmDialog(null,
+                    "Las tramas anteriores han sido exportada al archivo traza_exportada.cap",
+                    opcion,JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
                 }
       public static String convertirDecimalABinarioLongitud(long decimal,int n) {
 	StringBuilder binario = new StringBuilder();
