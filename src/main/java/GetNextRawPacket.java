@@ -49,55 +49,60 @@ public class GetNextRawPacket {
     private static final String NIF_NAME_KEY = GetNextRawPacket.class.getName() + ".nifName";
     private static final String NIF_NAME = System.getProperty(NIF_NAME_KEY);
     
-    
-
-    private GetNextRawPacket() {
-    }
-
     public static void main(String[] args) throws PcapNativeException, NotOpenException, IllegalRawDataException {
         Scanner scanner = new Scanner(System.in);
         PcapHandle handle = null;
-        String opcion, filtro;
-        int COUNT = 0;
-        opcion = (String) JOptionPane.showInputDialog(null,
+        String optionToGet, filtro;
+        int numberWeft = 0;
+        
+        // Muestra ventana para escoger la forma en como se obtienen los paquetes
+        optionToGet = (String) JOptionPane.showInputDialog(null,
                     "Opciones disponibles",
                     "Analizador de paquetes",
                     JOptionPane.QUESTION_MESSAGE,
                     null,
                     MENU,
                     MENU[0]);
-        /*System.out.println("Analizador de protocolos\n");
-        System.out.print("Elige una de las siguientes opciones:\n");
-        System.out.println("0 --> Realizar traza de captura de paquetes al vuelo");
-        System.out.println("1 --> Cargar traza de captura de paquetes desde un archivo");
-        int opcion = Integer.parseInt(scanner.nextLine());*/
+        
+       // Muestra ventana para obtener el número de tramas a obtener
         try{
-            COUNT = Integer.parseInt(JOptionPane.showInputDialog(
-                    null,
+            numberWeft = Integer.parseInt(JOptionPane.showInputDialog(null,
                     "Ingresa el numero de tramas a ser capturada",
-                    opcion,
+                    optionToGet,
                     JOptionPane.QUESTION_MESSAGE
                 ));
         }catch(NumberFormatException e){
                 System.exit(0);
         }
-        /*System.out.println("\nIngrese la cantidad de tramas a ser capturadas y analizadas: ");
-        int COUNT = Integer.getInteger(COUNT_KEY, Integer.parseInt(scanner.nextLine())); //especifica la cantidad de tramas
-        */
         
-        if(opcion.equals("Captura de paquetes desde un archivo")){ //carga un archivo .pcap
-            System.out.println("Ingresa el nombre de tu archivo con el formato: nombreArchivo.pcap");
-            String PCAP_FILE = System.getProperty(PCAP_FILE_KEY, scanner.nextLine());
+        /*Carga un archivo .pcap*/
+        if(optionToGet.equals("Captura de paquetes desde un archivo")){             
+            // Muestra ventana para obtener el nombre del archivo
+            String PCAP_FILE = null;
+            try{
+                PCAP_FILE = System.getProperty(PCAP_FILE_KEY, 
+                       (String) JOptionPane.showInputDialog(null,
+                               "Ingresa el nombre de tu archivo con el formato: \n                     nombreArchivo.pcap",
+                               optionToGet,
+                               JOptionPane.QUESTION_MESSAGE
+                               )
+               );  
+            }catch(NumberFormatException e){
+                    System.exit(0);
+            }            
+            
+            // Abrimos el archivo de tramas
             try {
                 handle = Pcaps.openOffline(PCAP_FILE, TimestampPrecision.NANO);
             } catch (PcapNativeException e) {
                 handle = Pcaps.openOffline(PCAP_FILE);
             }
-        } else if(opcion.equals("Captura de paquetes al vuelo")){ // captura tramas al vuelo
+            
+        } else if(optionToGet.equals("Captura de paquetes al vuelo")){ // captura tramas al vuelo
             JOptionPane.showConfirmDialog(null,
                     "A continuación se imprimiran en consola las tarjetas de red disponibles",
-                    opcion,JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
-            System.out.println(COUNT_KEY + ": " + COUNT);
+                    optionToGet,JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+            System.out.println(COUNT_KEY + ": " + numberWeft);
             System.out.println(READ_TIMEOUT_KEY + ": " + READ_TIMEOUT);
             System.out.println(SNAPLEN_KEY + ": " + SNAPLEN);
             System.out.println(BUFFER_SIZE_KEY + ": " + BUFFER_SIZE);
@@ -150,8 +155,8 @@ public class GetNextRawPacket {
 
             handle.setFilter(filter, BpfCompileMode.OPTIMIZE);
             JOptionPane.showConfirmDialog(null,
-                    "A continuación se imprimiran en consola "+COUNT+" tramas de tipo "+ filtro,
-                    opcion,JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+                    "A continuación se imprimiran en consola "+numberWeft+" tramas de tipo "+ filtro,
+                    optionToGet,JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
             
         }
         
@@ -433,14 +438,14 @@ public class GetNextRawPacket {
                             }//for
                             System.out.println("");
                             num++;
-                            if (num >= COUNT) {
+                            if (num >= numberWeft) {
                                 break;
                             }
 
                         }
 
                     }
-                    if(opcion.equals("Captura de paquetes al vuelo")){      
+                    if(optionToGet.equals("Captura de paquetes al vuelo")){      
                         PcapStat ps = handle.getStats();
                         System.out.println("ps_recv: " + ps.getNumPacketsReceived());
                         System.out.println("ps_drop: " + ps.getNumPacketsDropped());
@@ -453,18 +458,18 @@ public class GetNextRawPacket {
                     handle.close();
                     JOptionPane.showConfirmDialog(null,
                     "Las tramas anteriores han sido exportada al archivo traza_exportada.cap",
-                    opcion,JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+                    optionToGet,JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
                 }
-      public static String convertirDecimalABinarioLongitud(long decimal,int n) {
-	StringBuilder binario = new StringBuilder();
-	while (decimal > 0) {
-		short residuo = (short) (decimal % 2);
-		decimal = decimal / 2;
-		// Insertar el dígito al inicio de la cadena
-		binario.insert(0, String.valueOf(residuo));
-	}
-        while((binario.length()!=n))
-            binario.insert(0,"0");
-	return binario.toString();
+    public static String convertirDecimalABinarioLongitud(long decimal,int n) {
+        StringBuilder binario = new StringBuilder();
+        while (decimal > 0) {
+            short residuo = (short) (decimal % 2);
+            decimal = decimal / 2;
+            // Insertar el dígito al inicio de la cadena
+            binario.insert(0, String.valueOf(residuo));
+        }
+            while((binario.length()!=n))
+                binario.insert(0,"0");
+        return binario.toString();
+    }
 }
-            }
