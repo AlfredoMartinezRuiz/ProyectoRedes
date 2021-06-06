@@ -1,12 +1,16 @@
 
 /* interfaz 2*/
 import com.sun.jna.Platform;
+import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
+import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import org.pcap4j.core.BpfProgram;
 import org.pcap4j.core.BpfProgram.BpfCompileMode;
 import org.pcap4j.core.NotOpenException;
@@ -19,6 +23,7 @@ import org.pcap4j.core.PcapNetworkInterface;
 import org.pcap4j.core.PcapNetworkInterface.PromiscuousMode;
 import org.pcap4j.core.PcapStat;
 import org.pcap4j.core.Pcaps;
+import org.pcap4j.packet.IcmpV4CommonPacket;
 import org.pcap4j.packet.IllegalRawDataException;
 import org.pcap4j.packet.IpV4Packet;
 import org.pcap4j.packet.Packet;
@@ -71,13 +76,26 @@ public class GetNextRawPacket {
             // Muestra ventana para obtener el nombre del archivo
             String PCAP_FILE = null;
             try {
-                PCAP_FILE = System.getProperty(PCAP_FILE_KEY, (String) JOptionPane.showInputDialog(null,
-                        "Ingresa el nombre de tu archivo con el formato: \n                     nombreArchivo.pcap",
-                        optionToGet, JOptionPane.QUESTION_MESSAGE));
+                JFileChooser fileChooser = new JFileChooser();
+                File file = new File("./");
+                fileChooser.setCurrentDirectory(file);
+                fileChooser.setDialogTitle("Escoja el archivo para obtener las tramas");
+                FileNameExtensionFilter filter = new FileNameExtensionFilter("Archivos PCAP", "pcap");                
+                fileChooser.setFileFilter(filter);
+                fileChooser.setApproveButtonText("Abrir archivo");
+                
+                int seleccion = fileChooser.showSaveDialog(null);
+                
+                if (seleccion == JFileChooser.APPROVE_OPTION){
+                    file = fileChooser.getSelectedFile();
+                    PCAP_FILE = System.getProperty(PCAP_FILE_KEY, file.getPath());
+                }
+                else
+                    System.exit(0);           
+            
             } catch (NumberFormatException e) {
                 System.exit(0);
             }
-
             // Abrimos el archivo de tramas
             try {
                 handle = Pcaps.openOffline(PCAP_FILE, TimestampPrecision.NANO);
@@ -240,6 +258,8 @@ public class GetNextRawPacket {
                             System.out.println("Tamaño protocolo IP: " + ihl + " bytes.");
                             byte[] tmp_ip = Arrays.copyOfRange(packet, 14, 14 + ihl);
                             IpV4Packet ip = IpV4Packet.newPacket(tmp_ip, 0, tmp_ip.length);
+                            
+                            int proto=(ip.getHeader().getProtocol().value().intValue());
                             System.out.println("Versión: IpV" + ip.getHeader().getVersion().valueAsString() + ". \n");
                             System.out.println(
                                     "Longitud de la cabecera: " + (ip.getHeader().getIhlAsInt() * 32) + " bits.");
@@ -258,7 +278,7 @@ public class GetNextRawPacket {
                             int ttl = (ip.getHeader().getTtlAsInt());
                             System.out.println("Tiempo de vida: " + ttl);
                             String protocolo = (ip.getHeader().getProtocol().name());
-                            System.out.println("Protocolo: " + protocolo);
+                            System.out.println("|Protocolo: " + protocolo + "|");
                             short check_sum = (ip.getHeader().getHeaderChecksum());
                             System.out.println("Suma de verificación de la cabecera: " + check_sum);
                             String source = (ip.getHeader().getSrcAddr().getHostAddress());
@@ -270,6 +290,18 @@ public class GetNextRawPacket {
                             for (byte i = 0; i < option.size(); i++) {
                                 System.out.println(option.get(i).getType());
                             }
+                            
+                            /* Para el protocolo ICMP */
+                            int lt_PDU_Transp=lt-ihl*4;
+                            switch(proto){
+                                case (int)1:
+                                    System.out.println("|Protocolo ICMP: "+proto + "|");
+                                    IcmpV4CommonPacket icmp=IcmpV4CommonPacket.newPacket(packet,14+ihl,14+ihl+lt_PDU_Transp);
+                                    System.out.println("Tipo: "+icmp.getHeader().getType().valueAsString()+"("+icmp.getHeader().getType().name()+")");
+                                    System.out.println("Código: "+icmp.getHeader().getCode().valueAsString()+"("+icmp.getHeader().getCode().name()+")");
+                                    System.out.println("Cheksum: "+icmp.getHeader().getChecksum());
+                                    break;
+                            }                            
                             break;
                         default:
                             System.out.println("Not identified");
@@ -455,6 +487,9 @@ public class GetNextRawPacket {
                 }
             }
         }
+        System.out.println("");
+        System.out.println("-------------------Estadístas-------------------"
+                + "");
         if (optionToGet.equals("Captura de paquetes al vuelo")) {
             PcapStat ps = handle.getStats();
             System.out.println("ps_recv: " + ps.getNumPacketsReceived());
