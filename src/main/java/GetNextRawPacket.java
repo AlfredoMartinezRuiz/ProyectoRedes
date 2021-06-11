@@ -153,7 +153,7 @@ public class GetNextRawPacket {
                     JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
         }
 
-        String outFileName = "traza_exportada.cap";
+        String outFileName = "traza_exportada.pcap";
         PcapDumper dumper = handle.dumpOpen(outFileName); // exportamos el archivo
 
         int num = 0;
