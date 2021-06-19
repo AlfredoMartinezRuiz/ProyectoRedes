@@ -27,6 +27,8 @@ import org.pcap4j.packet.IcmpV4CommonPacket;
 import org.pcap4j.packet.IllegalRawDataException;
 import org.pcap4j.packet.IpV4Packet;
 import org.pcap4j.packet.Packet;
+import org.pcap4j.packet.TcpPacket;
+import org.pcap4j.packet.UdpPacket;
 import org.pcap4j.packet.namednumber.IpNumber;
 import org.pcap4j.util.ByteArrays;
 import org.pcap4j.util.NifSelector;
@@ -35,7 +37,7 @@ import org.pcap4j.util.NifSelector;
 public class GetNextRawPacket {
     private static final String[] MENU = { "Captura de paquetes al vuelo", "Captura de paquetes desde un archivo", };
 
-    private static final String[] TYPE = { "ARP", "IP" };
+    private static final String[] TYPE = {"LLC", "ARP", "IP" , "ICMP" , "IGMP", "TCP", "UDP"};
 
     private static final String PCAP_FILE_KEY = GetNextRawPacket.class.getName() + ".pcapFile";
 
@@ -162,7 +164,21 @@ public class GetNextRawPacket {
 
             if (packet == null) {
                 continue;
-            } else {                 
+            } else {
+                if (num >= numberWeft) {
+                    break;
+                }
+                System.out.println("---------------------------------------------------------------------------------------------------------------------------------------------------------------");
+                System.out.println(handle.getTimestamp());
+                for (int j = 0; j < packet.length; j++) {
+                    System.out.printf("%02X ", packet[j]);
+                    if ((j+1)%16 == 0) {
+                        System.out.println("");
+                    }
+                }
+                System.out.println("\n");
+                num++;
+
                 dumper.dumpRaw(packet, handle.getTimestamp()); // escribimos en el archivo las tramas
 
                 int tipo_b1 = (packet[12] >= 0) ? packet[12] * 256 : (packet[12] + 256) * 256;
@@ -170,14 +186,11 @@ public class GetNextRawPacket {
                 int tipo_b2 = (packet[13] >= 0) ? packet[13] : packet[13] + 256;
                 // Segundo byte del campo tipo
                 int tipo = tipo_b1 + tipo_b2; // suma binaria
-                
-                System.out.println("");
-                System.out.println("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------");
 
                 System.out.print("Campo tipo [" + tipo + "]");
 
                 if (tipo >= 1500) {
-                    System.out.println("Trama Ethernet");
+                    System.out.println(" Trama Ethernet");
 
                     switch (tipo) {
                         case (int) 2054:
@@ -278,7 +291,7 @@ public class GetNextRawPacket {
                             int ttl = (ip.getHeader().getTtlAsInt());
                             System.out.println("Tiempo de vida: " + ttl);
                             String protocolo = (ip.getHeader().getProtocol().name());
-                            System.out.println("|Protocolo: " + protocolo + "|");
+                            System.out.println("Protocolo: " + protocolo +" ("+proto+")");
                             short check_sum = (ip.getHeader().getHeaderChecksum());
                             System.out.println("Suma de verificación de la cabecera: " + check_sum);
                             String source = (ip.getHeader().getSrcAddr().getHostAddress());
@@ -293,13 +306,94 @@ public class GetNextRawPacket {
                             
                             /* Para el protocolo ICMP */
                             int lt_PDU_Transp=lt-ihl*4;
+                            /* Para el protocolo IGMP, TCP y UDP */
+                            int lt_PDU_Transp_2=lt-ihl;
                             switch(proto){
                                 case (int)1:
-                                    System.out.println("|Protocolo ICMP: "+proto + "|");
+                                    System.out.println("\nAnalisis ICMP");
                                     IcmpV4CommonPacket icmp=IcmpV4CommonPacket.newPacket(packet,14+ihl,14+ihl+lt_PDU_Transp);
                                     System.out.println("Tipo: "+icmp.getHeader().getType().valueAsString()+"("+icmp.getHeader().getType().name()+")");
                                     System.out.println("Código: "+icmp.getHeader().getCode().valueAsString()+"("+icmp.getHeader().getCode().name()+")");
                                     System.out.println("Cheksum: "+icmp.getHeader().getChecksum());
+                                    break;
+                                case (int)2:
+                                    System.out.println("\nAnalisis IGMP");
+                                    byte [] tmp_igmp=Arrays.copyOfRange(packet,14+ihl,14+ihl+lt_PDU_Transp_2);
+                                    int tipo_igmp = Byte.toUnsignedInt(tmp_igmp[0]);
+                                    switch(tipo_igmp){
+                                        case(int) 17: System.out.println("Type: Membership Query ("+String.format("0x%2x", tipo_igmp)+")");
+                                        break;
+                                        case(int) 18: System.out.println("Type: IGMPv1 Membership Report ("+String.format("0x%2x", tipo_igmp)+")");
+                                            System.out.printf("Direccion de grupo: %d.%d.%d.%d\n",Byte.toUnsignedInt(tmp_igmp[4]),Byte.toUnsignedInt(tmp_igmp[5]),Byte.toUnsignedInt(tmp_igmp[6]),Byte.toUnsignedInt(tmp_igmp[7]));
+                                        break;
+                                        case(int) 22: System.out.println("Type: IGMPv2 Membership Report ("+String.format("0x%2x", tipo_igmp)+")");
+                                            int mrt = Byte.toUnsignedInt(tmp_igmp[1]);
+                                            System.out.println("Max Resp Time: "+mrt);
+                                            System.out.printf("Direccion de grupo: %d.%d.%d.%d\n",Byte.toUnsignedInt(tmp_igmp[4]),Byte.toUnsignedInt(tmp_igmp[5]),Byte.toUnsignedInt(tmp_igmp[6]),Byte.toUnsignedInt(tmp_igmp[7]));
+                                        break;
+                                        case(int) 23: System.out.println("Type: Leave Group"+String.format("0x%2x", tipo_igmp)+")");
+                                        break;
+                                        case(int) 34: System.out.println("Type: IGMPv3 Membership Report ("+String.format("0x%2x", tipo_igmp)+")");
+                                            int nrg = Byte.toUnsignedInt(tmp_igmp[6])*256 +  Byte.toUnsignedInt(tmp_igmp[7]);
+                                            System.out.println("Numero de registros de Grupo: "+nrg);
+                                            if(nrg > 0)
+                                            IGMPv3GR(tmp_igmp,nrg);
+                                        break;
+                                    }
+                                    int check_igmp = Byte.toUnsignedInt(tmp_igmp[2])+Byte.toUnsignedInt(tmp_igmp[3]);
+                                    System.out.println("Checksum: "+check_igmp);
+                                    break;
+                                case (int)6:
+                                    System.out.println("\nAnalisis TCP");
+                                    byte[] tmp_tcp = Arrays.copyOfRange(packet, 14+ihl, 14+ihl+lt_PDU_Transp_2);
+                                    TcpPacket tcp =TcpPacket.newPacket(tmp_tcp, 0, tmp_tcp.length);
+                                    int pto_o =(tcp.getHeader().getSrcPort().valueAsInt()>0)?tcp.getHeader().getSrcPort().valueAsInt():tcp.getHeader().getSrcPort().valueAsInt()+65536;
+                                    System.out.println("Puerto origen: "+pto_o);
+                                    int pto_d =(tcp.getHeader().getDstPort().valueAsInt()>0)?tcp.getHeader().getDstPort().valueAsInt():tcp.getHeader().getDstPort().valueAsInt()+65536;
+                                    System.out.println("Puerto destino: "+pto_d);
+                                    long sn = tcp.getHeader().getSequenceNumberAsLong();
+                                    System.out.println("Numero de secuencia: "+sn);
+                                    long aln = tcp.getHeader().getAcknowledgmentNumberAsLong();
+                                    System.out.println("Número de acuse de recibo: "+aln);
+                                    int tcp_length = tcp.getHeader().length();
+                                    System.out.println("Longitud de TCP: "+tcp_length);
+                                    System.out.print("Banderas: ");
+                                    if(tcp.getHeader().getFin()==true)
+                                        System.out.print("(FIN) ");
+                                    if(tcp.getHeader().getSyn()==true)
+                                        System.out.print("(SYN) ");
+                                    if(tcp.getHeader().getRst()==true)
+                                        System.out.print("(RST) ");
+                                    if(tcp.getHeader().getPsh()==true)
+                                        System.out.print("(PSH) ");
+                                    if(tcp.getHeader().getAck()==true)
+                                        System.out.print("(ACK) ");
+                                    if(tcp.getHeader().getUrg()==true)
+                                        System.out.println("(URG)");
+                                    int w = tcp.getHeader().getWindowAsInt();
+                                    System.out.println("\nTamaño de Ventana: "+w);
+                                    short checksum_tcp = tcp.getHeader().getChecksum();
+                                    System.out.println("Checksum: "+checksum_tcp);
+                                    int up = tcp.getHeader().getUrgentPointerAsInt();
+                                    System.out.println("Punto urgente: "+up);
+                                    List<TcpPacket.TcpOption> option_tcp = tcp.getHeader().getOptions();
+                                    System.out.println("Optiones [" + option_tcp.size() + "]: " + option_tcp);
+                                    for (byte i = 0; i < option_tcp.size(); i++) {
+                                        System.out.println(option_tcp.get(i).getKind());
+                                    }
+                                    break;
+                                case(int) 17:
+                                    System.out.println("\nAnalisis UDP");
+                                    byte[] tmp_udp = Arrays.copyOfRange(packet, 14+ihl, 14+ihl+lt_PDU_Transp_2);
+                                    UdpPacket udp =UdpPacket.newPacket(tmp_udp, 0, tmp_udp.length);
+                                    int upto_o =(udp.getHeader().getSrcPort().valueAsInt()>0)?udp.getHeader().getSrcPort().valueAsInt():udp.getHeader().getSrcPort().valueAsInt()+65536;
+                                    System.out.println("Puerto origen: "+upto_o);
+                                    int upto_d =(udp.getHeader().getDstPort().valueAsInt()>0)?udp.getHeader().getDstPort().valueAsInt():udp.getHeader().getDstPort().valueAsInt()+65536;
+                                    System.out.println("Puerto destino: "+upto_d);
+                                    int udp_length = udp.getHeader().getLengthAsInt();
+                                    System.out.println("Longitud de UDP: "+udp_length);
+                                    short checksum_udp = udp.getHeader().getChecksum();
+                                    System.out.println("Checksum: "+checksum_udp);
                                     break;
                             }                            
                             break;
@@ -307,7 +401,7 @@ public class GetNextRawPacket {
                             System.out.println("Not identified");
                     }
                 } else {
-                    System.out.println("\nTrama IEEE802.3");
+                    System.out.println(" Trama IEEE802.3");
                     System.out.println("Longitud de la trama: " + tipo + " bytes");
 
                     int i_g = packet[14] & 0x01;
@@ -471,20 +565,9 @@ public class GetNextRawPacket {
                         }
                     }
                 }
-
-                System.out.println(handle.getTimestamp());
                 
-                for (int j = 0; j < packet.length; j++) {
-                    System.out.printf("%02X ", packet[j]);
-                    if (j % 16 == 0) {
-                        System.out.println("");
-                    }
-                }
-                System.out.println("");
-                num++;
-                if (num >= numberWeft) {
-                    break;
-                }
+              
+                
             }
         }
         System.out.println("");
@@ -517,4 +600,41 @@ public class GetNextRawPacket {
             binario.insert(0, "0");
         return binario.toString();
     }
+    
+    private static void IGMPv3recordType(int tipo) {
+        switch(tipo){
+            case 1: System.out.println("MODE_IS_INCLUDE" + " (" + tipo + ")\n"); 
+                break;
+            case 2: System.out.println("MODE_IS_INCLUDE" + " (" + tipo + ")\n");
+                break;
+            case 3: System.out.println("Change_TO_INCLUDE_MODE" + " (" + tipo + ")\n");
+                break;
+            case 4: System.out.println("Change_TO_EXCLUDE_MODE" + " (" + tipo + ")\n");
+                break;
+        }
+  }
+  
+    public static void IGMPv3SA(byte[] packet,int nf, int num) {
+          int i; 
+          for(i = 1; i <= nf; i++){
+              System.out.printf("Direccion de Fuente: %d.%d.%d.%d",Byte.toUnsignedInt(packet[num++]),
+              Byte.toUnsignedInt(packet[num++]), Byte.toUnsignedInt(packet[num++]), Byte.toUnsignedInt(packet[num++])); 
+          }
+    }
+
+    private static void IGMPv3GR(byte[] packet,int nrg) {
+          int i; int num = 8;
+          for(i = 1; i <= nrg; i++){
+              System.out.println("Registro de grupo [" + i + "]\n");
+              System.out.println("Tipo de registro: "); IGMPv3recordType(Byte.toUnsignedInt(packet[num++]));
+              System.out.println("Datos auxiliares: " + Byte.toUnsignedInt(packet[num++]));
+              int nf = Byte.toUnsignedInt(packet[num++])*256 + Byte.toUnsignedInt(packet[num++]);
+              System.out.println("Numero de fuentes: " + nf);
+              System.out.printf("Direccion de grupo: %d.%d.%d.%d\n",Byte.toUnsignedInt(packet[num++]), Byte.toUnsignedInt(packet[num++]),
+              Byte.toUnsignedInt(packet[num++]), Byte.toUnsignedInt(packet[num++]));
+              if(nf > 0)
+                  IGMPv3SA(packet,nf,num);
+
+          }
+      }
 }
