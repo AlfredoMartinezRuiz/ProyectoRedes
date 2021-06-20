@@ -191,7 +191,6 @@ public class GetNextRawPacket {
 
                 if (tipo >= 1500) {
                     System.out.println(" Trama Ethernet");
-
                     switch (tipo) {
                         case (int) 2054:
                             System.out.println("\nPROTOCOLO ARP");
@@ -265,8 +264,8 @@ public class GetNextRawPacket {
                             break;
 
                         case (int) 2048:
-
                             System.out.println("Protocolo IP.");
+                            
                             int ihl = (packet[14] & 0x0f) * 4;
                             System.out.println("Tamaño protocolo IP: " + ihl + " bytes.");
                             byte[] tmp_ip = Arrays.copyOfRange(packet, 14, 14 + ihl);
@@ -324,12 +323,14 @@ public class GetNextRawPacket {
                                         case(int) 17: System.out.println("Type: Membership Query ("+String.format("0x%2x", tipo_igmp)+")");
                                         break;
                                         case(int) 18: System.out.println("Type: IGMPv1 Membership Report ("+String.format("0x%2x", tipo_igmp)+")");
-                                            System.out.printf("Direccion de grupo: %d.%d.%d.%d\n",Byte.toUnsignedInt(tmp_igmp[4]),Byte.toUnsignedInt(tmp_igmp[5]),Byte.toUnsignedInt(tmp_igmp[6]),Byte.toUnsignedInt(tmp_igmp[7]));
+                                            System.out.printf("Direccion de grupo: %d.%d.%d.%d\n",
+                                                    Byte.toUnsignedInt(tmp_igmp[4]),Byte.toUnsignedInt(tmp_igmp[5]),Byte.toUnsignedInt(tmp_igmp[6]),Byte.toUnsignedInt(tmp_igmp[7]));
                                         break;
                                         case(int) 22: System.out.println("Type: IGMPv2 Membership Report ("+String.format("0x%2x", tipo_igmp)+")");
                                             int mrt = Byte.toUnsignedInt(tmp_igmp[1]);
                                             System.out.println("Max Resp Time: "+mrt);
-                                            System.out.printf("Direccion de grupo: %d.%d.%d.%d\n",Byte.toUnsignedInt(tmp_igmp[4]),Byte.toUnsignedInt(tmp_igmp[5]),Byte.toUnsignedInt(tmp_igmp[6]),Byte.toUnsignedInt(tmp_igmp[7]));
+                                            System.out.printf("Direccion de grupo: %d.%d.%d.%d\n",
+                                                    Byte.toUnsignedInt(tmp_igmp[4]),Byte.toUnsignedInt(tmp_igmp[5]),Byte.toUnsignedInt(tmp_igmp[6]),Byte.toUnsignedInt(tmp_igmp[7]));
                                         break;
                                         case(int) 23: System.out.println("Type: Leave Group"+String.format("0x%2x", tipo_igmp)+")");
                                         break;
@@ -377,7 +378,7 @@ public class GetNextRawPacket {
                                     int up = tcp.getHeader().getUrgentPointerAsInt();
                                     System.out.println("Punto urgente: "+up);
                                     List<TcpPacket.TcpOption> option_tcp = tcp.getHeader().getOptions();
-                                    System.out.println("Optiones [" + option_tcp.size() + "]: " + option_tcp);
+                                    System.out.println("Opciones [" + option_tcp.size() + "]: " + option_tcp);
                                     for (byte i = 0; i < option_tcp.size(); i++) {
                                         System.out.println(option_tcp.get(i).getKind());
                                     }
@@ -502,7 +503,6 @@ public class GetNextRawPacket {
                             int bit5 = (((packet[16] >> 7) & 0x01) * 1);
 
                             int codigo = bit1 + bit2 + bit3 + bit4 + bit5;
-
                             System.out.println("Codigo de trama sin numerar (decimal): " + codigo);
                             switch (codigo) {
                                 case 0:
@@ -584,7 +584,7 @@ public class GetNextRawPacket {
         }
         dumper.close();
         handle.close();
-        JOptionPane.showConfirmDialog(null, "Las tramas anteriores han sido exportada al archivo traza_exportada.cap",
+        JOptionPane.showConfirmDialog(null, "Las tramas anteriores han sido exportada al archivo traza_exportada.pcap",
                 optionToGet, JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
     }
 
@@ -634,7 +634,6 @@ public class GetNextRawPacket {
               Byte.toUnsignedInt(packet[num++]), Byte.toUnsignedInt(packet[num++]));
               if(nf > 0)
                   IGMPv3SA(packet,nf,num);
-
           }
       }
 }
