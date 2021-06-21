@@ -37,7 +37,7 @@ import org.pcap4j.util.NifSelector;
 public class GetNextRawPacket {
     private static final String[] MENU = { "Captura de paquetes al vuelo", "Captura de paquetes desde un archivo", };
 
-    private static final String[] TYPE = {"LLC", "ARP", "IP" , "ICMP" , "IGMP", "TCP", "UDP"};
+    private static final String[] TYPE = {"SIN FILTRO","LLC", "ARP", "IP" , "ICMP" , "IGMP", "TCP", "UDP"};
 
     private static final String PCAP_FILE_KEY = GetNextRawPacket.class.getName() + ".pcapFile";
 
@@ -142,7 +142,9 @@ public class GetNextRawPacket {
             // Muestra ventana para obtener el filtro del paquete
             filtro = (String) JOptionPane.showInputDialog(null, "Filtros disponibles", "Analizador de paquetes",
                     JOptionPane.QUESTION_MESSAGE, null, TYPE, TYPE[0]);
-
+            if("SIN FILTRO".equals(filtro)){
+                filtro = "";
+            }
             String filter = args.length != 0 ? args[0] : filtro.toLowerCase();
             handle = new PcapHandle.Builder(nif.getName()).snaplen(SNAPLEN).promiscuousMode(PromiscuousMode.PROMISCUOUS)
                     .timeoutMillis(READ_TIMEOUT).bufferSize(BUFFER_SIZE).build();
